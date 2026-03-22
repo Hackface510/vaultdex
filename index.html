@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VaultDex - Collectibles Portfolio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: { 950: '#09090b' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background: #09090b; color: #fafafa; font-family: 'Inter', sans-serif; }
+        .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; }
+        .badge-public { background: rgba(16,185,129,0.2); color: #34d399; border-radius: 20px; padding: 2px 10px; font-size: 12px; }
+        .badge-private { background: rgba(113,113,122,0.2); color: #a1a1aa; border-radius: 20px; padding: 2px 10px; font-size: 12px; }
+        .badge-sale { background: rgba(245,158,11,0.2); color: #fbbf24; border-radius: 20px; padding: 2px 10px; font-size: 12px; }
+        .btn-primary { background: #4f46e5; color: white; border-radius: 8px; padding: 8px 16px; border: none; cursor: pointer; font-size: 14px; }
+        .btn-primary:hover { background: #4338ca; }
+        .btn-ghost { background: transparent; color: #a1a1aa; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 8px 16px; cursor: pointer; font-size: 14px; }
+        .btn-ghost:hover { background: rgba(255,255,255,0.05); }
+        .tab-btn { background: transparent; border: none; color: #a1a1aa; padding: 8px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; }
+        .tab-btn.active { color: white; border-bottom-color: #4f46e5; }
+        input, select, textarea { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; padding: 8px 12px; font-size: 14px; width: 100%; box-sizing: border-box; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #4f46e5; }
+        select option { background: #1a1a2e; }
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 50; display: flex; align-items: center; justify-content: center; }
+        .modal { background: #18181b; border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 24px; width: 90%; max-width: 500px; max-height: 90vh; overflow-y: auto; }
+        .asset-img { width: 100%; height: 140px; object-fit: cover; border-radius: 8px 8px 0 0; }
+        .gain-pos { color: #34d399; }
+        .gain-neg { color: #f87171; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header style="border-bottom: 1px solid rgba(255,255,255,0.1); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: rgba(9,9,11,0.95); backdrop-filter: blur(10px); z-index: 40;">
+            <div style="display:flex;align-items:center;gap:12px;">
+                <span style="font-size:20px;">⚡</span>
+                <span style="font-weight:700;font-size:18px;">VaultDex</span>
+            </div>
+            <nav style="display:flex;gap:8px;">
+                <button class="tab-btn active" onclick="showTab('portfolio')" id="tab-portfolio">Portfolio</button>
+                <button class="tab-btn" onclick="showTab('marketplace')" id="tab-marketplace">Marketplace</button>
+            </nav>
+            <button class="btn-primary" onclick="showAddModal()">+ Add Asset</button>
+        </header>
+        
+        <!-- Stats Bar -->
+        <div id="stats-bar" style="padding:16px 24px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;border-bottom:1px solid rgba(255,255,255,0.05);">
+            <div class="card" style="padding:16px;text-align:center;">
+                <p style="color:#a1a1aa;font-size:12px;margin:0 0 4px">Total Items</p>
+                <p style="font-size:24px;font-weight:700;margin:0" id="stat-items">-</p>
+            </div>
+            <div class="card" style="padding:16px;text-align:center;">
+                <p style="color:#a1a1aa;font-size:12px;margin:0 0 4px">Portfolio Value</p>
+                <p style="font-size:24px;font-weight:700;margin:0" id="stat-value">-</p>
+            </div>
+            <div class="card" style="padding:16px;text-align:center;">
+                <p style="color:#a1a1aa;font-size:12px;margin:0 0 4px">Total Cost</p>
+                <p style="font-size:24px;font-weight:700;margin:0" id="stat-cost">-</p>
+            </div>
+            <div class="card" style="padding:16px;text-align:center;">
+                <p style="color:#a1a1aa;font-size:12px;margin:0 0 4px">Total Gain</p>
+                <p style="font-size:24px;font-weight:700;margin:0" id="stat-gain">-</p>
+            </div>
+        </div>
+
+        <!-- Portfolio Tab -->
+        <div id="view-portfolio" style="padding:24px;">
+            <!-- Category Filter -->
+            <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap;" id="category-filter">
+                <button class="btn-primary" onclick="filterCategory('all')" id="cat-all">All</button>
+                <button class="btn-ghost" onclick="filterCategory('Pokemon')" id="cat-Pokemon">Pokemon</button>
+                <button class="btn-ghost" onclick="filterCategory('Magic')" id="cat-Magic">Magic</button>
+                <button class="btn-ghost" onclick="filterCategory('Comics')" id="cat-Comics">Comics</button>
+                <button class="btn-ghost" onclick="filterCategory('One Piece TCG')" id="cat-OnePieceTCG">One Piece</button>
+            </div>
+            
+            <!-- Assets Grid -->
+            <div id="assets-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;">
+                <p style="color:#a1a1aa">Loading...</p>
+            </div>
+        </div>
+        
+        <!-- Marketplace Tab -->
+        <div id="view-marketplace" style="padding:24px;display:none;">
+            <h2 style="font-size:20px;font-weight:700;margin-bottom:16px;">Marketplace</h2>
+            <div id="market-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;">
+                <p style="color:#a1a1aa">Loading marketplace...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Asset Modal -->
+    <div id="add-modal" class="modal-overlay" style="display:none;">
+        <div class="modal">
+            <h2 style="font-size:18px;font-weight:700;margin:0 0 20px">Add New Asset</h2>
+            <form id="add-form" onsubmit="submitAdd(event)">
+                <div style="display:grid;gap:12px;">
+                    <div>
+                        <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Title *</label>
+                        <input name="title" placeholder="e.g. Charizard Base Set 1st Edition" required>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div>
+                            <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Category *</label>
+                            <select name="category" required>
+                                <option value="">Select...</option>
+                                <option>Pokemon</option>
+                                <option>Magic</option>
+                                <option>Comics</option>
+                                <option>Sports Cards</option>
+                                <option>One Piece TCG</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Type *</label>
+                            <select name="asset_type" required>
+                                <option value="">Select...</option>
+                                <option>Card</option>
+                                <option>Sealed Product</option>
+                                <option>Graded Card</option>
+                                <option>Graded Comic</option>
+                                <option>Booster Box</option>
+                                <option>Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                        <div>
+                            <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Purchase Price</label>
+                            <input name="purchase_price" type="number" step="0.01" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Current Value</label>
+                            <input name="current_value" type="number" step="0.01" placeholder="0.00">
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Qty</label>
+                            <input name="qty" type="number" value="1" min="1">
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div>
+                            <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Condition</label>
+                            <select name="condition">
+                                <option>NM</option><option>LP</option><option>MP</option><option>HP</option>
+                                <option>PSA 10</option><option>PSA 9</option><option>PSA 8</option>
+                                <option>CGC 10</option><option>CGC 9.5</option><option>CGC 9</option><option>CGC 8.5</option>
+                                <option>Mint</option><option>Sealed</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Visibility</label>
+                            <select name="visibility">
+                                <option value="public">Public</option>
+                                <option value="private">Private</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Image URL</label>
+                        <input name="image" placeholder="https://...">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Notes</label>
+                        <textarea name="notes" rows="2" placeholder="Additional details..."></textarea>
+                    </div>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end;">
+                    <button type="button" class="btn-ghost" onclick="closeAddModal()">Cancel</button>
+                    <button type="submit" class="btn-primary">Add Asset</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Asset Detail Modal -->
+    <div id="detail-modal" class="modal-overlay" style="display:none;">
+        <div class="modal" id="detail-content"></div>
+    </div>
+
+    <!-- List For Sale Modal -->
+    <div id="sell-modal" class="modal-overlay" style="display:none;">
+        <div class="modal">
+            <h2 style="font-size:18px;font-weight:700;margin:0 0 16px">List For Sale</h2>
+            <input type="hidden" id="sell-asset-id">
+            <div>
+                <label style="font-size:12px;color:#a1a1aa;display:block;margin-bottom:4px">Asking Price ($)</label>
+                <input id="sell-price" type="number" step="0.01" placeholder="0.00">
+            </div>
+            <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end;">
+                <button class="btn-ghost" onclick="document.getElementById('sell-modal').style.display='none'">Cancel</button>
+                <button class="btn-primary" onclick="submitListing()">List Item</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allAssets = [];
+        let currentCategory = 'all';
+
+        async function loadStats() {
+            const r = await fetch('/api/stats');
+            const s = await r.json();
+            document.getElementById('stat-items').textContent = s.total_items;
+            document.getElementById('stat-value').textContent = '$' + s.total_value.toLocaleString();
+            document.getElementById('stat-cost').textContent = '$' + s.total_cost.toLocaleString();
+            const gainEl = document.getElementById('stat-gain');
+            gainEl.textContent = (s.total_gain >= 0 ? '+$' : '-$') + Math.abs(s.total_gain).toLocaleString() + ' (' + s.gain_pct + '%)';
+            gainEl.className = s.total_gain >= 0 ? 'gain-pos' : 'gain-neg';
+            gainEl.style.fontSize = '24px';
+            gainEl.style.fontWeight = '700';
+        }
+
+        async function loadAssets() {
+            const r = await fetch('/api/assets');
+            allAssets = await r.json();
+            renderAssets();
+        }
+
+        function renderAssets() {
+            const filtered = currentCategory === 'all' ? allAssets : allAssets.filter(a => a.category === currentCategory);
+            const grid = document.getElementById('assets-grid');
+            if (filtered.length === 0) {
+                grid.innerHTML = '<p style="color:#a1a1aa">No assets found. Add your first collectible!</p>';
+                return;
+            }
+            grid.innerHTML = filtered.map(asset => renderAssetCard(asset)).join('');
+        }
+
+        function renderAssetCard(a) {
+            const gain = a.current_value - a.purchase_price;
+            const gainPct = a.purchase_price > 0 ? ((gain / a.purchase_price) * 100).toFixed(1) : 0;
+            const gainClass = gain >= 0 ? 'gain-pos' : 'gain-neg';
+            const gainStr = (gain >= 0 ? '+$' : '-$') + Math.abs(gain).toFixed(0);
+            const img = a.image || 'https://images.unsplash.com/photo-1607537573965-12f856af48e9?w=400';
+            return `<div class="card" style="overflow:hidden;cursor:pointer;" onclick="showDetail(${a.id})">
+                <div style="position:relative;">
+                    <img src="${img}" class="asset-img" onerror="this.src='https://via.placeholder.com/400x140/1a1a2e/ffffff?text=VaultDex'">
+                    <span style="position:absolute;top:8px;right:8px;" class="${a.visibility === 'public' ? 'badge-public' : 'badge-private'}">${a.visibility}</span>
+                    ${a.for_sale ? '<span style="position:absolute;top:8px;left:8px;" class="badge-sale">For Sale</span>' : ''}
+                </div>
+                <div style="padding:12px;">
+                    <p style="font-weight:600;margin:0 0 4px;font-size:14px;line-height:1.3">${a.title}</p>
+                    <p style="color:#a1a1aa;font-size:12px;margin:0 0 8px">${a.category} • ${a.asset_type} • ${a.condition || 'N/A'}</p>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <p style="font-weight:700;margin:0">$${a.current_value?.toLocaleString()}</p>
+                        <span class="${gainClass}" style="font-size:12px">${gainStr} (${gainPct}%)</span>
+                    </div>
+                </div>
+            </div>`;
+        }
+
+        function showDetail(id) {
+            const a = allAssets.find(x => x.id === id);
+            if (!a) return;
+            const gain = a.current_value - a.purchase_price;
+            const gainPct = a.purchase_price > 0 ? ((gain / a.purchase_price) * 100).toFixed(1) : 0;
+            const gainClass = gain >= 0 ? 'gain-pos' : 'gain-neg';
+            const img = a.image || 'https://via.placeholder.com/400x200/1a1a2e/ffffff?text=VaultDex';
+            document.getElementById('detail-content').innerHTML = `
+                <img src="${img}" style="width:100%;height:180px;object-fit:cover;border-radius:8px;margin-bottom:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px;">
+                    <div>
+                        <h2 style="font-size:18px;font-weight:700;margin:0 0 4px">${a.title}</h2>
+                        <p style="color:#a1a1aa;font-size:13px;margin:0">${a.category} • ${a.asset_type} • ${a.condition || 'N/A'}</p>
+                    </div>
+                    <span class="${a.visibility === 'public' ? 'badge-public' : 'badge-private'}">${a.visibility}</span>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+                    <div class="card" style="padding:12px;">
+                        <p style="color:#a1a1aa;font-size:11px;margin:0 0 4px">Current Value</p>
+                        <p style="font-weight:700;font-size:18px;margin:0">$${a.current_value?.toLocaleString()}</p>
+                    </div>
+                    <div class="card" style="padding:12px;">
+                        <p style="color:#a1a1aa;font-size:11px;margin:0 0 4px">Gain/Loss</p>
+                        <p class="${gainClass}" style="font-weight:700;font-size:18px;margin:0">${gain >= 0 ? '+' : ''}$${gain.toFixed(0)} (${gainPct}%)</p>
+                    </div>
+                </div>
+                ${a.notes ? `<p style="color:#a1a1aa;font-size:13px;margin-bottom:16px">${a.notes}</p>` : ''}
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn-ghost" onclick="toggleVisibility(${a.id}, '${a.visibility === 'public' ? 'private' : 'public'}')">
+                        ${a.visibility === 'public' ? '🔒 Make Private' : '🌐 Make Public'}
+                    </button>
+                    ${!a.for_sale ? `<button class="btn-primary" onclick="openSellModal(${a.id})">💰 List For Sale</button>` : `<button class="btn-ghost" onclick="unlistAsset(${a.id})">❌ Remove Listing</button>`}
+                    <button class="btn-ghost" onclick="closeDetail()">Close</button>
+                </div>`;
+            document.getElementById('detail-modal').style.display = 'flex';
+        }
+
+        function closeDetail() {
+            document.getElementById('detail-modal').style.display = 'none';
+        }
+
+        async function toggleVisibility(id, newVis) {
+            await fetch('/api/assets/' + id + '/visibility', {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({visibility: newVis})
+            });
+            await loadAssets();
+            closeDetail();
+        }
+
+        function openSellModal(id) {
+            document.getElementById('sell-asset-id').value = id;
+            document.getElementById('sell-price').value = '';
+            document.getElementById('sell-modal').style.display = 'flex';
+            closeDetail();
+        }
+
+        async function submitListing() {
+            const id = document.getElementById('sell-asset-id').value;
+            const price = document.getElementById('sell-price').value;
+            if (!price) { alert('Please enter a price'); return; }
+            await fetch('/api/assets/' + id + '/list', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({price: parseFloat(price)})
+            });
+            document.getElementById('sell-modal').style.display = 'none';
+            await loadAssets();
+            alert('Item listed for sale!');
+        }
+
+        async function unlistAsset(id) {
+            await fetch('/api/assets/' + id + '/unlist', {method: 'DELETE'});
+            await loadAssets();
+            closeDetail();
+        }
+
+        async function loadMarketplace() {
+            const r = await fetch('/api/marketplace');
+            const items = await r.json();
+            const grid = document.getElementById('market-grid');
+            if (items.length === 0) {
+                grid.innerHTML = '<p style="color:#a1a1aa">No items listed for sale yet.</p>';
+                return;
+            }
+            grid.innerHTML = items.map(item => `
+                <div class="card" style="overflow:hidden;">
+                    <img src="${item.image || 'https://via.placeholder.com/400x140'}" class="asset-img" onerror="this.src='https://via.placeholder.com/400x140/1a1a2e/ffffff?text=VaultDex'">
+                    <div style="padding:12px;">
+                        <p style="font-weight:600;margin:0 0 4px;font-size:14px">${item.title}</p>
+                        <p style="color:#a1a1aa;font-size:12px;margin:0 0 8px">${item.category} • Sold by ${item.seller_name}</p>
+                        <p style="font-weight:700;font-size:18px;margin:0 0 12px">$${item.listing_price?.toLocaleString()}</p>
+                        <div style="display:flex;gap:8px;">
+                            <button class="btn-primary" style="flex:1" onclick="buyNow(${item.listing_id}, '${item.title}', ${item.listing_price})">Buy Now</button>
+                            <button class="btn-ghost" onclick="makeOffer(${item.listing_id})">Make Offer</button>
+                        </div>
+                    </div>
+                </div>`).join('');
+        }
+
+        async function buyNow(listingId, title, price) {
+            if (!confirm(`Buy ${title} for $${price}?`)) return;
+            const r = await fetch('/api/listings/' + listingId + '/buy', {method: 'POST'});
+            const data = await r.json();
+            alert(data.message);
+            await loadMarketplace();
+            await loadAssets();
+            await loadStats();
+        }
+
+        async function makeOffer(listingId) {
+            const amount = prompt('Enter your offer amount ($):');
+            if (!amount) return;
+            const msg = prompt('Add a message (optional):') || '';
+            const r = await fetch('/api/offers', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({listing_id: listingId, amount: parseFloat(amount), message: msg})
+            });
+            const data = await r.json();
+            alert(data.message || 'Offer submitted!');
+        }
+
+        function showTab(tab) {
+            document.getElementById('view-portfolio').style.display = tab === 'portfolio' ? 'block' : 'none';
+            document.getElementById('view-marketplace').style.display = tab === 'marketplace' ? 'block' : 'none';
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tab).classList.add('active');
+            if (tab === 'marketplace') loadMarketplace();
+        }
+
+        function filterCategory(cat) {
+            currentCategory = cat;
+            document.querySelectorAll('[id^="cat-"]').forEach(b => {
+                b.className = b.id === 'cat-' + cat.replace(' ','') ? 'btn-primary' : 'btn-ghost';
+            });
+            renderAssets();
+        }
+
+        function showAddModal() {
+            document.getElementById('add-modal').style.display = 'flex';
+        }
+
+        function closeAddModal() {
+            document.getElementById('add-modal').style.display = 'none';
+            document.getElementById('add-form').reset();
+        }
+
+        async function submitAdd(e) {
+            e.preventDefault();
+            const form = new FormData(e.target);
+            const data = Object.fromEntries(form.entries());
+            data.current_value = parseFloat(data.current_value) || 0;
+            data.purchase_price = parseFloat(data.purchase_price) || 0;
+            data.qty = parseInt(data.qty) || 1;
+            const r = await fetch('/api/assets', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+            if (r.ok) {
+                closeAddModal();
+                await loadAssets();
+                await loadStats();
+            } else {
+                alert('Error adding asset');
+            }
+        }
+
+        // Init
+        loadStats();
+        loadAssets();
+    </script>
+</body>
+</html>
